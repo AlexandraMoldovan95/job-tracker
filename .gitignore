@@ -1,0 +1,10 @@
+# Internal process docs — kept locally for reference, not published to the public repo
+CLAUDE.md
+REPORT.md
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/

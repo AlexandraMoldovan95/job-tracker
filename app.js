@@ -1,0 +1,507 @@
+/* ======================================================================
+   CONFIG — replace with your own URL and publishable key from Supabase
+   (Settings -> API)
+   ====================================================================== */
+const SUPABASE_URL = "https://jenfjfhbhelpllkprygu.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_VSrYIeBa3AaSmy3QsApwsw_spnYp2PW";
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+/* ======================================================================
+   STRIPE — for demonstration only (Stripe Payment Link, test mode).
+   There is no backend/webhook here: the button only opens the checkout page
+   hosted by Stripe. No access is granted automatically in the app based on
+   payment — that would need a serverless function (Supabase Edge Function /
+   Netlify Function) listening for the successful-payment webhook.
+   Replace the link below with your own from the Stripe Dashboard →
+   Payment Links → Create (Test mode, so no real card is requested).
+   ====================================================================== */
+const STRIPE_PAYMENT_LINK = "https://buy.stripe.com/test_28E00lgI24fCbulb8U5AQ00";
+
+document.getElementById("supportBtn").addEventListener("click", ()=>{
+  if(STRIPE_PAYMENT_LINK.includes("REPLACE_ME")){
+    toast("Add your Stripe Payment Link in the code (STRIPE_PAYMENT_LINK) — see the comment in app.js.", true);
+    return;
+  }
+  window.open(STRIPE_PAYMENT_LINK, "_blank", "noopener");
+});
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load", ()=>{
+    navigator.serviceWorker.register("sw.js").catch(()=>{});
+  });
+}
+
+const STATUS_LABELS = { aplicat:"Applied", interviu:"Interview", oferta:"Offer", respins:"Rejected", retras:"Withdrawn" };
+const STATUS_ORDER = ["aplicat","interviu","oferta","respins","retras"];
+
+let currentUser = null;
+let companii = [];
+let aplicari = [];
+let cvVersiuni = [];
+
+/* ---------------- Toast ---------------- */
+function toast(msg, isError){
+  const el = document.createElement("div");
+  el.className = "toast";
+  if(isError){ el.style.background = "var(--bad)"; el.style.borderColor = "var(--bad)"; el.style.color = "#050010"; }
+  el.textContent = msg;
+  document.getElementById("toastRoot").appendChild(el);
+  setTimeout(()=>el.remove(), 3200);
+}
+
+/* ---------------- Auth ---------------- */
+let authMode = "login";
+document.getElementById("toggleLogin").addEventListener("click", ()=>setAuthMode("login"));
+document.getElementById("toggleRegister").addEventListener("click", ()=>setAuthMode("register"));
+function setAuthMode(mode){
+  authMode = mode;
+  document.getElementById("toggleLogin").classList.toggle("active", mode==="login");
+  document.getElementById("toggleRegister").classList.toggle("active", mode==="register");
+  document.getElementById("authSubmit").textContent = mode==="login" ? "Login" : "Create account";
+  document.getElementById("authError").textContent = "";
+}
+
+document.getElementById("authForm").addEventListener("submit", async (e)=>{
+  e.preventDefault();
+  const email = document.getElementById("authEmail").value.trim();
+  const password = document.getElementById("authPassword").value;
+  const errEl = document.getElementById("authError");
+  errEl.textContent = "";
+  const submitBtn = document.getElementById("authSubmit");
+  submitBtn.disabled = true;
+  try{
+    if(authMode === "login"){
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if(error) throw error;
+    } else {
+      const { error } = await sb.auth.signUp({ email, password });
+      if(error) throw error;
+      errEl.style.color = "var(--good)";
+      errEl.textContent = "Account created. If email confirmation is required, check your inbox; otherwise you're logged in automatically.";
+    }
+  } catch(err){
+    errEl.style.color = "var(--bad)";
+    errEl.textContent = friendlyAuthError(err.message, authMode);
+  } finally {
+    submitBtn.disabled = false;
+  }
+});
+
+/* Security note: on registration we deliberately do NOT confirm whether the
+   email already has an account ("an account with this email already exists")
+   — that would allow account enumeration (someone could check, email by
+   email, who uses the app). The message below is intentionally ambiguous
+   on registration. */
+function friendlyAuthError(msg, mode){
+  if(mode === "register" && /already registered/i.test(msg)){
+    return "Registration failed. Check the email you entered, or try logging in instead.";
+  }
+  if(/invalid login credentials/i.test(msg)) return "Incorrect email or password.";
+  if(/password/i.test(msg) && /6/i.test(msg)) return "Password must be at least 6 characters.";
+  return msg || "Something went wrong.";
+}
+
+document.getElementById("logoutBtn").addEventListener("click", async ()=>{
+  await sb.auth.signOut();
+});
+
+sb.auth.onAuthStateChange((event, session)=>{
+  currentUser = session ? session.user : null;
+  if(currentUser){
+    document.getElementById("authScreen").classList.add("hidden");
+    document.getElementById("appScreen").classList.remove("hidden");
+    document.getElementById("userEmail").textContent = currentUser.email;
+    loadAll();
+  } else {
+    document.getElementById("appScreen").classList.add("hidden");
+    document.getElementById("authScreen").classList.remove("hidden");
+  }
+});
+
+/* ---------------- Tabs ---------------- */
+document.querySelectorAll(".tab-btn").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
+    document.querySelectorAll(".tab-panel").forEach(p=>p.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("tab-"+btn.dataset.tab).classList.add("active");
+  });
+});
+
+/* ---------------- Data loading ---------------- */
+async function loadAll(){
+  await Promise.all([loadCompanii(), loadAplicari(), loadCv()]);
+  renderCompanii();
+  renderAplicari();
+  renderDashboard();
+  renderCv();
+}
+
+async function loadCv(){
+  const { data, error } = await sb.from("cv_versiuni").select("*").order("updated_at", { ascending:false });
+  if(error){ toast("Error loading resumes: " + error.message, true); return; }
+  cvVersiuni = data || [];
+}
+
+async function loadCompanii(){
+  const { data, error } = await sb.from("companii").select("*").order("created_at", { ascending:false });
+  if(error){ toast("Error loading companies: " + error.message, true); return; }
+  companii = data || [];
+}
+
+async function loadAplicari(){
+  const { data, error } = await sb.from("aplicari").select("*, companii(id, nume)").order("created_at", { ascending:false });
+  if(error){ toast("Error loading applications: " + error.message, true); return; }
+  aplicari = data || [];
+}
+
+/* ---------------- Modal helper ----------------
+   Note: the modal no longer closes on backdrop click — only Cancel or Save.
+   Reason: otherwise, selecting text in an input/textarea (a click+drag that
+   visually ends over the backdrop) would accidentally close the modal and you
+   would lose what you were writing. */
+function openModal(title, bodyHtml, onSubmit){
+  const root = document.getElementById("modalRoot");
+  root.innerHTML = `
+    <div class="modal-backdrop" id="modalBackdrop">
+      <div class="modal">
+        <div class="modal-titlebar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <h3>${title}</h3>
+        </div>
+        <div class="modal-body">
+          <form id="modalForm">${bodyHtml}
+            <div class="modal-actions">
+              <button type="button" class="btn-secondary" id="modalCancel">Cancel</button>
+              <button type="submit" class="btn-primary" id="modalSave">Save</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>`;
+  const form = document.getElementById("modalForm");
+  const saveBtn = document.getElementById("modalSave");
+  form.addEventListener("input", ()=>{ saveBtn.classList.add("needs-save"); }, { once:false });
+  document.getElementById("modalCancel").addEventListener("click", closeModal);
+  form.addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    await onSubmit(new FormData(e.target));
+  });
+}
+function closeModal(){ document.getElementById("modalRoot").innerHTML = ""; }
+
+/* ---------------- Companii CRUD ---------------- */
+document.getElementById("addCompanyBtn").addEventListener("click", ()=>openCompanyModal());
+
+/* Event delegation on the list, instead of inline onclick="" on each row
+   (fragile under a strict CSP and, potentially, under XSS if the id were ever
+   not a server-generated UUID). */
+document.getElementById("companiiList").addEventListener("click", (e)=>{
+  const btn = e.target.closest("button[data-action]");
+  if(!btn) return;
+  const id = btn.dataset.id;
+  if(btn.dataset.action === "edit") editCompanyById(id);
+  else if(btn.dataset.action === "delete") deleteCompany(id);
+});
+
+function openCompanyModal(company){
+  const isEdit = !!company;
+  openModal(isEdit ? "Edit company" : "New company", `
+    <div class="field"><label>Company name</label><input name="nume" required value="${escapeHtml(company?.nume||"")}"></div>
+    <div class="field"><label>Website (optional)</label><input name="website" value="${escapeHtml(company?.website||"")}"></div>
+    <div class="field"><label>Notes (optional)</label><textarea name="notite" rows="3">${escapeHtml(company?.notite||"")}</textarea></div>
+  `, async (fd)=>{
+    const payload = {
+      nume: fd.get("nume").trim(),
+      website: fd.get("website").trim() || null,
+      notite: fd.get("notite").trim() || null,
+    };
+    let error;
+    if(isEdit){
+      ({ error } = await sb.from("companii").update(payload).eq("id", company.id));
+    } else {
+      payload.user_id = currentUser.id;
+      ({ error } = await sb.from("companii").insert(payload));
+    }
+    if(error){ toast("Error: " + error.message, true); return; }
+    closeModal();
+    toast(isEdit ? "Company updated." : "Company added.");
+    await loadCompanii(); await loadAplicari();
+    renderCompanii(); renderAplicari(); renderDashboard();
+  });
+}
+
+async function deleteCompany(id){
+  if(!confirm("Delete this company? Its applications will be deleted too.")) return;
+  const { error } = await sb.from("companii").delete().eq("id", id);
+  if(error){ toast("Error: " + error.message, true); return; }
+  toast("Company deleted.");
+  await loadCompanii(); await loadAplicari();
+  renderCompanii(); renderAplicari(); renderDashboard();
+}
+
+function renderCompanii(){
+  const el = document.getElementById("companiiList");
+  if(companii.length === 0){
+    el.innerHTML = `<div class="empty-state">No companies yet. Add your first one with the button above.</div>`;
+    return;
+  }
+  el.innerHTML = companii.map(c=>{
+    const nrAplicari = aplicari.filter(a=>a.companie_id===c.id).length;
+    return `
+    <div class="row-item">
+      <div class="row-main">
+        <div class="row-title">${escapeHtml(c.nume)}</div>
+        <div class="row-sub">${nrAplicari} application(s)${c.website ? " · " + escapeHtml(c.website) : ""}</div>
+      </div>
+      <div class="row-actions">
+        <button class="btn-secondary" data-action="edit" data-id="${c.id}">Edit</button>
+        <button class="btn-danger" data-action="delete" data-id="${c.id}">Delete</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+function editCompanyById(id){ openCompanyModal(companii.find(c=>c.id===id)); }
+
+/* ---------------- Aplicari CRUD ---------------- */
+document.getElementById("addApplicationBtn").addEventListener("click", ()=>{
+  if(companii.length === 0){ toast("Add a company first.", true); return; }
+  openApplicationModal();
+});
+
+document.getElementById("aplicariList").addEventListener("click", (e)=>{
+  const btn = e.target.closest("button[data-action]");
+  if(!btn) return;
+  const id = btn.dataset.id;
+  if(btn.dataset.action === "edit") editApplicationById(id);
+  else if(btn.dataset.action === "delete") deleteApplication(id);
+});
+
+function openApplicationModal(app){
+  const isEdit = !!app;
+  const companyOptions = companii.map(c=>`<option value="${c.id}" ${app?.companie_id===c.id?"selected":""}>${escapeHtml(c.nume)}</option>`).join("");
+  const statusOptions = STATUS_ORDER.map(s=>`<option value="${s}" ${app?.status===s?"selected":""}>${STATUS_LABELS[s]}</option>`).join("");
+  openModal(isEdit ? "Edit application" : "New application", `
+    <div class="form-grid">
+      <div class="field full"><label>Company</label><select name="companie_id" required>${companyOptions}</select></div>
+      <div class="field full"><label>Position</label><input name="post" required value="${escapeHtml(app?.post||"")}"></div>
+      <div class="field"><label>Status</label><select name="status">${statusOptions}</select></div>
+      <div class="field"><label>Application date</label><input type="date" name="data_aplicarii" value="${app?.data_aplicarii || new Date().toISOString().slice(0,10)}"></div>
+      <div class="field full"><label>Estimated salary (optional)</label><input type="number" name="salariu_estimat" step="1" value="${app?.salariu_estimat ?? ""}"></div>
+      <div class="field full"><label>Notes (optional)</label><textarea name="notite" rows="3">${escapeHtml(app?.notite||"")}</textarea></div>
+    </div>
+  `, async (fd)=>{
+    const payload = {
+      companie_id: fd.get("companie_id"),
+      post: fd.get("post").trim(),
+      status: fd.get("status"),
+      data_aplicarii: fd.get("data_aplicarii") || null,
+      salariu_estimat: fd.get("salariu_estimat") ? Number(fd.get("salariu_estimat")) : null,
+      notite: fd.get("notite").trim() || null,
+    };
+    let error;
+    if(isEdit){
+      ({ error } = await sb.from("aplicari").update(payload).eq("id", app.id));
+    } else {
+      payload.user_id = currentUser.id;
+      ({ error } = await sb.from("aplicari").insert(payload));
+    }
+    if(error){ toast("Error: " + error.message, true); return; }
+    closeModal();
+    toast(isEdit ? "Application updated." : "Application added.");
+    await loadAplicari();
+    renderAplicari(); renderCompanii(); renderDashboard();
+  });
+}
+
+async function deleteApplication(id){
+  if(!confirm("Delete this application?")) return;
+  const { error } = await sb.from("aplicari").delete().eq("id", id);
+  if(error){ toast("Error: " + error.message, true); return; }
+  toast("Application deleted.");
+  await loadAplicari();
+  renderAplicari(); renderCompanii(); renderDashboard();
+}
+
+function renderAplicari(){
+  const el = document.getElementById("aplicariList");
+  if(aplicari.length === 0){
+    el.innerHTML = `<div class="empty-state">No applications yet.</div>`;
+    return;
+  }
+  el.innerHTML = aplicari.map(a=>`
+    <div class="row-item">
+      <div class="row-main">
+        <div class="row-title">${escapeHtml(a.post)} <span class="badge badge-${a.status}">${STATUS_LABELS[a.status]}</span></div>
+        <div class="row-sub">${escapeHtml(a.companii?.nume || "—")} · ${a.data_aplicarii || "no date"}</div>
+      </div>
+      <div class="row-actions">
+        <button class="btn-secondary" data-action="edit" data-id="${a.id}">Edit</button>
+        <button class="btn-danger" data-action="delete" data-id="${a.id}">Delete</button>
+      </div>
+    </div>`).join("");
+}
+function editApplicationById(id){ openApplicationModal(aplicari.find(a=>a.id===id)); }
+
+/* ---------------- CV CRUD ---------------- */
+document.getElementById("addCvBtn").addEventListener("click", ()=>openCvModal());
+
+document.getElementById("cvList").addEventListener("click", (e)=>{
+  const btn = e.target.closest("button[data-action]");
+  if(!btn) return;
+  const id = btn.dataset.id;
+  if(btn.dataset.action === "export") exportCv(id);
+  else if(btn.dataset.action === "edit") editCvById(id);
+  else if(btn.dataset.action === "delete") deleteCv(id);
+});
+
+const CV_FIELDS = [
+  { key:"descriere",   label:"Description / About me",   rows:3,  placeholder:"A short summary about you (optional)." },
+  { key:"experienta",  label:"Experience",                rows:6,  placeholder:"Jobs, role, period, achievements..." },
+  { key:"educatie",    label:"Education",                 rows:4,  placeholder:"School/university, major, period..." },
+  { key:"competente",  label:"Skills",                    rows:3,  placeholder:"Technical skills, tools, languages..." },
+  { key:"proiecte",    label:"Projects",                  rows:4,  placeholder:"Relevant personal/course projects..." },
+  { key:"voluntariat", label:"Volunteering",              rows:3,  placeholder:"Volunteer activities (optional)." },
+];
+
+function openCvModal(cv){
+  const isEdit = !!cv;
+  const fieldsHtml = CV_FIELDS.map(f=>`
+    <div class="field full">
+      <label>${f.label}</label>
+      <textarea name="${f.key}" rows="${f.rows}" placeholder="${f.placeholder}">${escapeHtml(cv?.[f.key]||"")}</textarea>
+    </div>`).join("");
+  openModal(isEdit ? "Edit resume" : "New resume", `
+    <div class="field full"><label>Version name</label><input name="nume_versiune" required placeholder="e.g. Frontend, Full-stack" value="${escapeHtml(cv?.nume_versiune||"")}"></div>
+    ${fieldsHtml}
+  `, async (fd)=>{
+    const payload = {
+      nume_versiune: fd.get("nume_versiune").trim(),
+      updated_at: new Date().toISOString(),
+    };
+    CV_FIELDS.forEach(f=>{ payload[f.key] = fd.get(f.key)?.trim() || null; });
+    let error;
+    if(isEdit){
+      ({ error } = await sb.from("cv_versiuni").update(payload).eq("id", cv.id));
+    } else {
+      payload.user_id = currentUser.id;
+      ({ error } = await sb.from("cv_versiuni").insert(payload));
+    }
+    if(error){ toast("Error: " + error.message, true); return; }
+    closeModal();
+    toast(isEdit ? "Resume updated." : "Resume added.");
+    await loadCv();
+    renderCv();
+  });
+}
+
+async function deleteCv(id){
+  if(!confirm("Delete this resume version?")) return;
+  const { error } = await sb.from("cv_versiuni").delete().eq("id", id);
+  if(error){ toast("Error: " + error.message, true); return; }
+  toast("Resume deleted.");
+  await loadCv();
+  renderCv();
+}
+
+function renderCv(){
+  const el = document.getElementById("cvList");
+  if(cvVersiuni.length === 0){
+    el.innerHTML = `<div class="empty-state">No resume versions yet. Add your first one with the button above.</div>`;
+    return;
+  }
+  el.innerHTML = cvVersiuni.map(cv=>{
+    const snippet = CV_FIELDS.map(f=>cv[f.key]).find(v=>v && v.trim()) || "";
+    return `
+    <div class="row-item">
+      <div class="row-main">
+        <div class="row-title">${escapeHtml(cv.nume_versiune)}</div>
+        <div class="row-sub">Updated: ${new Date(cv.updated_at).toLocaleDateString("en-US")}</div>
+        <div class="cv-preview">${escapeHtml(snippet.slice(0,160))}${snippet.length>160?"…":""}</div>
+      </div>
+      <div class="row-actions">
+        <button class="btn-secondary" data-action="export" data-id="${cv.id}">Export</button>
+        <button class="btn-secondary" data-action="edit" data-id="${cv.id}">Edit</button>
+        <button class="btn-danger" data-action="delete" data-id="${cv.id}">Delete</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+function editCvById(id){ openCvModal(cvVersiuni.find(cv=>cv.id===id)); }
+
+function exportCv(id){
+  const cv = cvVersiuni.find(c=>c.id===id);
+  if(!cv) return;
+  const sections = CV_FIELDS
+    .filter(f=>cv[f.key] && cv[f.key].trim())
+    .map(f=>`<section><h2>${escapeHtml(f.label)}</h2><pre>${escapeHtml(cv[f.key])}</pre></section>`)
+    .join("\n");
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(cv.nume_versiune)} — CV</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:wght@600&family=Source+Sans+3:wght@400;600&display=swap">
+<style>
+  body{font-family:"Source Sans 3",Georgia,serif;max-width:720px;margin:40px auto;padding:0 24px 60px;color:#2c2620;line-height:1.65;}
+  h1{font-family:"Newsreader",Georgia,serif;font-size:1.7rem;font-weight:600;border-bottom:2px solid #2b6777;padding-bottom:.35em;margin-bottom:.2em;}
+  h2{font-family:"Newsreader",Georgia,serif;font-size:1.1rem;font-weight:600;color:#2b6777;margin:1.6em 0 .3em;}
+  .meta{color:#6f6656;font-size:.82rem;margin-bottom:1.8rem;}
+  pre{white-space:pre-wrap;word-wrap:break-word;font-family:inherit;font-size:1rem;margin:0;}
+  @media print{ body{margin:0;padding:20px;} }
+</style>
+</head>
+<body>
+<h1>${escapeHtml(cv.nume_versiune)}</h1>
+<div class="meta">Exported from Job Tracker — ${new Date().toLocaleDateString("en-US")}</div>
+${sections || '<p style="color:#6f6656;">No content added yet.</p>'}
+</body>
+</html>`;
+  const blob = new Blob([html], { type:"text/html" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = (cv.nume_versiune || "cv").replace(/[^a-z0-9-_ ]/gi, "_").trim() + ".html";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  toast("Resume exported as an HTML file — you can open it in your browser and save as PDF (Print → Save as PDF), or open it in Word.");
+}
+
+/* ---------------- Dashboard ---------------- */
+function renderDashboard(){
+  document.getElementById("statTotal").textContent = aplicari.length;
+  document.getElementById("statCompanii").textContent = companii.length;
+  const finalizate = aplicari.filter(a=>["interviu","oferta","respins"].includes(a.status)).length;
+  const rate = aplicari.length ? Math.round((finalizate/aplicari.length)*100) : 0;
+  document.getElementById("statRate").textContent = rate + "%";
+  document.getElementById("statOferte").textContent = aplicari.filter(a=>a.status==="oferta").length;
+
+  const barColors = { aplicat:"var(--neutral)", interviu:"var(--warn)", oferta:"var(--good)", respins:"var(--bad)", retras:"#4a3d73" };
+  const max = Math.max(1, ...STATUS_ORDER.map(s=>aplicari.filter(a=>a.status===s).length));
+  document.getElementById("statusBars").innerHTML = STATUS_ORDER.map(s=>{
+    const count = aplicari.filter(a=>a.status===s).length;
+    const pct = (count/max)*100;
+    return `<div class="bar-row">
+      <div class="bar-label">${STATUS_LABELS[s]}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${barColors[s]}"></div></div>
+      <div class="bar-count">${count}</div>
+    </div>`;
+  }).join("");
+
+  const counts = {};
+  aplicari.forEach(a=>{ const n = a.companii?.nume || "—"; counts[n] = (counts[n]||0)+1; });
+  const top = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const topEl = document.getElementById("topCompanies");
+  topEl.innerHTML = top.length
+    ? top.map(([nume,count])=>`<div class="top-company"><span>${escapeHtml(nume)}</span><strong>${count}</strong></div>`).join("")
+    : `<div class="empty-state">No data yet.</div>`;
+}
+
+/* ---------------- Utils ---------------- */
+function escapeHtml(s){
+  return String(s ?? "").replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m]));
+}
