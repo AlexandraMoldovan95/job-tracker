@@ -136,8 +136,12 @@
     background:linear-gradient(to right,var(--orange),var(--magenta),var(--accent));
     -webkit-background-clip:text;background-clip:text;color:transparent;}
   .user-chip{display:flex;align-items:center;gap:1rem;font-size:.78rem;color:var(--accent);}
-  nav.tabs{display:flex;gap:.2rem;padding:.9rem 1.5rem 0;background:rgba(9,0,20,.85);border-bottom:1px solid var(--border);}
-  nav.tabs button{background:transparent;color:var(--text-dim);border:none;border-bottom:2px solid transparent;border-radius:0;padding:.7em 1.1em;}
+  nav.tabs{display:flex;gap:.2rem;padding:.9rem 1.5rem 0;background:rgba(9,0,20,.85);border-bottom:1px solid var(--border);overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  nav.tabs button{background:transparent;color:var(--text-dim);border:none;border-bottom:2px solid transparent;border-radius:0;padding:.7em 1.1em;flex-shrink:0;}
+  @media (max-width:480px){
+    nav.tabs{padding:.7rem .8rem 0;gap:.1rem;}
+    nav.tabs button{padding:.55em .5em;font-size:.68rem;letter-spacing:.02em;}
+  }
   nav.tabs button:hover{color:var(--text);}
   nav.tabs button.active{color:var(--accent);border-bottom-color:var(--accent);text-shadow:0 0 8px rgba(0,255,255,.7);}
   main{max-width:960px;margin:0 auto;padding:1.6rem;}
@@ -225,6 +229,8 @@
       <button type="submit" id="authSubmit" class="btn-primary">Login</button>
       <p class="auth-error" id="authError"></p>
     </form>
+    <button type="button" id="demoLoginBtn" class="btn-secondary" style="width:100%;margin-top:1rem;">Login demo</button>
+    <p style="text-align:center;color:var(--text-dim);font-size:.7rem;margin-top:.7rem;">No account needed — loads the app with sample data. Nothing you do in demo mode is saved to a server.</p>
   </div>
 </div>
 
@@ -233,6 +239,7 @@
   <header>
     <h1>Job Tracker</h1>
     <div class="user-chip">
+      <span id="demoBadge" class="hidden" style="color:var(--orange);font-weight:700;border:1px solid var(--orange);padding:.2em .6em;letter-spacing:.06em;">DEMO MODE</span>
       <span id="userEmail"></span>
       <button id="logoutBtn" class="btn-secondary">Logout</button>
     </div>

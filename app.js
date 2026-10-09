@@ -39,6 +39,58 @@ let currentUser = null;
 let companii = [];
 let aplicari = [];
 let cvVersiuni = [];
+let DEMO_MODE = false;
+
+function uid(){ return "demo-" + Math.random().toString(36).slice(2, 10); }
+
+/* ---------------- Demo mode ----------------
+   Lets anyone try the app with realistic sample data, with zero calls to
+   Supabase. Useful while the real project's database is paused — nothing
+   typed here is persisted anywhere, it only lives in this tab's memory. */
+function demoSeedData(){
+  const co1 = { id:"demo-co-1", nume:"Nova Peak Games", website:"novapeakgames.com", notite:"Referral from a former classmate.", created_at:"2026-09-02T09:00:00.000Z" };
+  const co2 = { id:"demo-co-2", nume:"Lighthouse Studios", website:"lighthousestudios.io", notite:null, created_at:"2026-09-10T09:00:00.000Z" };
+  const co3 = { id:"demo-co-3", nume:"BrightForge Interactive", website:"brightforge.dev", notite:"Found through BestJobs.eu.", created_at:"2026-09-18T09:00:00.000Z" };
+  const companiiSeed = [co3, co2, co1];
+  const aplicariSeed = [
+    { id:"demo-ap-1", companie_id:co1.id, post:"Game Designer", status:"interviu", data_aplicarii:"2026-09-03", salariu_estimat:4200, notite:"Second interview scheduled next week.", created_at:"2026-09-03T10:00:00.000Z", companii:{ id:co1.id, nume:co1.nume } },
+    { id:"demo-ap-2", companie_id:co1.id, post:"QA Analyst", status:"aplicat", data_aplicarii:"2026-09-05", salariu_estimat:null, notite:null, created_at:"2026-09-05T10:00:00.000Z", companii:{ id:co1.id, nume:co1.nume } },
+    { id:"demo-ap-3", companie_id:co2.id, post:"Associate Producer", status:"oferta", data_aplicarii:"2026-09-11", salariu_estimat:4800, notite:"Offer received, deciding by Friday.", created_at:"2026-09-11T10:00:00.000Z", companii:{ id:co2.id, nume:co2.nume } },
+    { id:"demo-ap-4", companie_id:co2.id, post:"Game Designer", status:"respins", data_aplicarii:"2026-09-12", salariu_estimat:null, notite:"Rejected after the first screening call.", created_at:"2026-09-12T10:00:00.000Z", companii:{ id:co2.id, nume:co2.nume } },
+    { id:"demo-ap-5", companie_id:co3.id, post:"QA Tester", status:"aplicat", data_aplicarii:"2026-09-19", salariu_estimat:3600, notite:null, created_at:"2026-09-19T10:00:00.000Z", companii:{ id:co3.id, nume:co3.nume } },
+  ];
+  const cvSeed = [
+    { id:"demo-cv-1", nume_versiune:"Game Design", updated_at:"2026-09-20T12:00:00.000Z",
+      descriere:"Game designer focused on systems and QA, with a habit of testing my own designs before anyone else does.",
+      experienta:"QA & design intern, 1 year — wrote test plans, logged defects, and proposed balance changes that shipped.",
+      educatie:"Game Design, in progress.",
+      competente:"Systems design, QA/test planning, Unreal Engine, prototyping in HTML/JS.",
+      proiecte:"Several small playable prototypes used to validate mechanics before full production.",
+      voluntariat:null },
+    { id:"demo-cv-2", nume_versiune:"QA", updated_at:"2026-09-21T12:00:00.000Z",
+      descriere:"QA-focused resume: test plans, defect tracking, regression testing.",
+      experienta:"Wrote and executed manual test plans (70+ cases) across two shipped apps; kept a defect log through to resolution.",
+      educatie:"Game Design, in progress.",
+      competente:"Test planning, defect triage, exploratory testing, basic test automation.",
+      proiecte:"QA pass on two personal portfolio apps, each with its own written test plan.",
+      voluntariat:null },
+  ];
+  return { companii: companiiSeed, aplicari: aplicariSeed, cvVersiuni: cvSeed };
+}
+
+document.getElementById("demoLoginBtn").addEventListener("click", ()=>{
+  DEMO_MODE = true;
+  currentUser = { id:"demo-user", email:"demo@jobtracker.app" };
+  const seed = demoSeedData();
+  companii = seed.companii;
+  aplicari = seed.aplicari;
+  cvVersiuni = seed.cvVersiuni;
+  document.getElementById("authScreen").classList.add("hidden");
+  document.getElementById("appScreen").classList.remove("hidden");
+  document.getElementById("userEmail").textContent = "demo@jobtracker.app";
+  document.getElementById("demoBadge").classList.remove("hidden");
+  renderCompanii(); renderAplicari(); renderDashboard(); renderCv();
+});
 
 /* ---------------- Toast ---------------- */
 function toast(msg, isError){
@@ -103,6 +155,15 @@ function friendlyAuthError(msg, mode){
 }
 
 document.getElementById("logoutBtn").addEventListener("click", async ()=>{
+  if(DEMO_MODE){
+    DEMO_MODE = false;
+    currentUser = null;
+    companii = []; aplicari = []; cvVersiuni = [];
+    document.getElementById("demoBadge").classList.add("hidden");
+    document.getElementById("appScreen").classList.add("hidden");
+    document.getElementById("authScreen").classList.remove("hidden");
+    return;
+  }
   await sb.auth.signOut();
 });
 
@@ -217,6 +278,14 @@ function openCompanyModal(company){
       website: fd.get("website").trim() || null,
       notite: fd.get("notite").trim() || null,
     };
+    if(DEMO_MODE){
+      if(isEdit){ Object.assign(company, payload); }
+      else { companii.unshift({ id:uid(), ...payload, created_at:new Date().toISOString() }); }
+      closeModal();
+      toast(isEdit ? "Company updated. (demo — not saved to a server)" : "Company added. (demo — not saved to a server)");
+      renderCompanii(); renderAplicari(); renderDashboard();
+      return;
+    }
     let error;
     if(isEdit){
       ({ error } = await sb.from("companii").update(payload).eq("id", company.id));
@@ -234,6 +303,13 @@ function openCompanyModal(company){
 
 async function deleteCompany(id){
   if(!confirm("Delete this company? Its applications will be deleted too.")) return;
+  if(DEMO_MODE){
+    companii = companii.filter(c=>c.id!==id);
+    aplicari = aplicari.filter(a=>a.companie_id!==id);
+    toast("Company deleted. (demo)");
+    renderCompanii(); renderAplicari(); renderDashboard();
+    return;
+  }
   const { error } = await sb.from("companii").delete().eq("id", id);
   if(error){ toast("Error: " + error.message, true); return; }
   toast("Company deleted.");
@@ -300,6 +376,16 @@ function openApplicationModal(app){
       salariu_estimat: fd.get("salariu_estimat") ? Number(fd.get("salariu_estimat")) : null,
       notite: fd.get("notite").trim() || null,
     };
+    if(DEMO_MODE){
+      const companyRef = companii.find(c=>c.id===payload.companie_id);
+      const companiiField = companyRef ? { id:companyRef.id, nume:companyRef.nume } : null;
+      if(isEdit){ Object.assign(app, payload, { companii: companiiField }); }
+      else { aplicari.unshift({ id:uid(), ...payload, created_at:new Date().toISOString(), companii: companiiField }); }
+      closeModal();
+      toast(isEdit ? "Application updated. (demo — not saved to a server)" : "Application added. (demo — not saved to a server)");
+      renderAplicari(); renderCompanii(); renderDashboard();
+      return;
+    }
     let error;
     if(isEdit){
       ({ error } = await sb.from("aplicari").update(payload).eq("id", app.id));
@@ -317,6 +403,12 @@ function openApplicationModal(app){
 
 async function deleteApplication(id){
   if(!confirm("Delete this application?")) return;
+  if(DEMO_MODE){
+    aplicari = aplicari.filter(a=>a.id!==id);
+    toast("Application deleted. (demo)");
+    renderAplicari(); renderCompanii(); renderDashboard();
+    return;
+  }
   const { error } = await sb.from("aplicari").delete().eq("id", id);
   if(error){ toast("Error: " + error.message, true); return; }
   toast("Application deleted.");
@@ -381,6 +473,14 @@ function openCvModal(cv){
       updated_at: new Date().toISOString(),
     };
     CV_FIELDS.forEach(f=>{ payload[f.key] = fd.get(f.key)?.trim() || null; });
+    if(DEMO_MODE){
+      if(isEdit){ Object.assign(cv, payload); }
+      else { cvVersiuni.unshift({ id:uid(), ...payload }); }
+      closeModal();
+      toast(isEdit ? "Resume updated. (demo — not saved to a server)" : "Resume added. (demo — not saved to a server)");
+      renderCv();
+      return;
+    }
     let error;
     if(isEdit){
       ({ error } = await sb.from("cv_versiuni").update(payload).eq("id", cv.id));
@@ -398,6 +498,12 @@ function openCvModal(cv){
 
 async function deleteCv(id){
   if(!confirm("Delete this resume version?")) return;
+  if(DEMO_MODE){
+    cvVersiuni = cvVersiuni.filter(cv=>cv.id!==id);
+    toast("Resume deleted. (demo)");
+    renderCv();
+    return;
+  }
   const { error } = await sb.from("cv_versiuni").delete().eq("id", id);
   if(error){ toast("Error: " + error.message, true); return; }
   toast("Resume deleted.");
