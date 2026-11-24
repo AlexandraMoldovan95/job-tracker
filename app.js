@@ -40,6 +40,8 @@ let companii = [];
 let aplicari = [];
 let cvVersiuni = [];
 let DEMO_MODE = false;
+// The shared demo account can't delete itself (see supabase/delete_my_account.sql).
+const SHARED_DEMO_ACCOUNT_ID = "b50e790b-6604-4833-bcc5-1bfd5a2a9668";
 
 function uid(){ return "demo-" + Math.random().toString(36).slice(2, 10); }
 
@@ -89,6 +91,7 @@ document.getElementById("demoLoginBtn").addEventListener("click", ()=>{
   document.getElementById("appScreen").classList.remove("hidden");
   document.getElementById("userEmail").textContent = "demo@jobtracker.app";
   document.getElementById("demoBadge").classList.remove("hidden");
+  updateDeleteAccountButton();
   renderCompanii(); renderAplicari(); renderDashboard(); renderCv();
 });
 
@@ -167,8 +170,56 @@ document.getElementById("logoutBtn").addEventListener("click", async ()=>{
   await sb.auth.signOut();
 });
 
+/* ---------------- Delete account ----------------
+   Deletes the signed-in user's companies, applications, resume versions and the
+   account itself. The browser can't delete an account with the public key, so
+   it calls the database function delete_my_account() (supabase/delete_my_account.sql),
+   which runs with admin rights but only ever for the user who calls it. */
+function updateDeleteAccountButton(){
+  const hide = DEMO_MODE || !currentUser || currentUser.id === SHARED_DEMO_ACCOUNT_ID;
+  document.getElementById("deleteAccountBtn").classList.toggle("hidden", hide);
+}
+
+document.getElementById("deleteAccountBtn").addEventListener("click", ()=>{
+  if(DEMO_MODE || !currentUser) return;
+  openModal("Delete account", `
+    <p>This permanently deletes your account (<strong>${escapeHtml(currentUser.email)}</strong>)
+      and everything you saved in it: companies, applications and resume versions.
+      It can't be undone.</p>
+    <div class="field"><label for="deleteConfirm">Type DELETE to confirm</label>
+      <input id="deleteConfirm" name="confirm" autocomplete="off" required></div>
+  `, async (fd)=>{
+    if(String(fd.get("confirm")).trim() !== "DELETE") return; // the button is disabled until then anyway
+    const deleteBtn = document.getElementById("modalSave");
+    deleteBtn.disabled = true;
+    deleteBtn.textContent = "Deleting...";
+    const { error } = await sb.rpc("delete_my_account");
+    if(error){
+      deleteBtn.disabled = false;
+      deleteBtn.textContent = "Delete my account";
+      toast("Error: " + error.message, true);
+      return;
+    }
+    closeModal();
+    companii = []; aplicari = []; cvVersiuni = [];
+    // The account no longer exists on the server; only clear the session saved in this browser.
+    await sb.auth.signOut({ scope: "local" });
+    toast("Your account and all your data were deleted.");
+  });
+  // The modal's main button says "Save" by default: here it says what it does,
+  // and it stays disabled until DELETE is typed, so it can't be pressed by accident.
+  const deleteBtn = document.getElementById("modalSave");
+  deleteBtn.textContent = "Delete my account";
+  deleteBtn.className = "btn-danger";
+  deleteBtn.disabled = true;
+  document.getElementById("deleteConfirm").addEventListener("input", (e)=>{
+    deleteBtn.disabled = e.target.value.trim() !== "DELETE";
+  });
+});
+
 sb.auth.onAuthStateChange((event, session)=>{
   currentUser = session ? session.user : null;
+  updateDeleteAccountButton();
   if(currentUser){
     document.getElementById("authScreen").classList.add("hidden");
     document.getElementById("appScreen").classList.remove("hidden");

@@ -98,6 +98,8 @@
 
   .btn-danger{border-color:var(--bad);color:var(--bad);background:transparent;}
   .btn-danger:hover{background:var(--bad);color:#000;box-shadow:0 0 16px var(--bad);transform:skewX(0deg);}
+  /* "Delete my account" stays visibly inactive until the user types DELETE */
+  .btn-danger:disabled,.btn-danger:disabled:hover{opacity:.45;cursor:not-allowed;background:transparent;color:var(--bad);box-shadow:none;}
 
   nav.tabs button, .auth-toggle button{transform:none;}
   .row-actions button{transform:skewX(-3deg);padding:.4em .8em;font-size:.72rem;}
@@ -246,6 +248,7 @@
       <span id="demoBadge" class="hidden" style="color:var(--orange);font-weight:700;border:1px solid var(--orange);padding:.2em .6em;letter-spacing:.06em;">DEMO MODE</span>
       <span id="userEmail"></span>
       <button id="logoutBtn" class="btn-secondary">Logout</button>
+      <button id="deleteAccountBtn" class="btn-danger hidden">Delete account</button>
     </div>
   </header>
 
