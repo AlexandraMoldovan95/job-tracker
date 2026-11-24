@@ -130,6 +130,14 @@
   .auth-toggle button.active{background:var(--accent);color:#000;}
   .auth-error{color:var(--bad);font-size:.78rem;margin-top:.7rem;min-height:1.3em;}
   #authSubmit{width:100%;margin-top:.5rem;}
+  /* Demo comes first and filled: a visitor can look around without an account.
+     The real login below stays an outline button, so the two don't compete. */
+  .btn-demo{width:100%;border-color:var(--accent);background:var(--accent);color:#000;}
+  .btn-demo:hover{box-shadow:0 0 22px var(--accent);transform:skewX(0deg);}
+  .demo-note{text-align:center;color:var(--text-dim);font-size:.8rem;line-height:1.45;margin:.8rem 0 0;}
+  .auth-divider{display:flex;align-items:center;gap:.8em;margin:1.6rem 0 1.2rem;color:var(--text-dim);
+    font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;}
+  .auth-divider::before,.auth-divider::after{content:"";flex:1;height:1px;background:rgba(224,224,224,.2);}
 
   /* ---------- App shell ---------- */
   header{display:flex;align-items:center;justify-content:space-between;padding:1.1rem 1.5rem;
@@ -219,6 +227,9 @@
   <div class="auth-card">
     <h1>Job Tracker</h1>
     <p class="auth-sub">Track your job applications.</p>
+    <button type="button" id="demoLoginBtn" class="btn-demo">Login demo</button>
+    <p class="demo-note">No account needed: loads the app with sample data. Nothing you do in demo mode is saved to a server.</p>
+    <p class="auth-divider">or use your account</p>
     <div class="auth-toggle">
       <button id="toggleLogin" class="active" type="button">Login</button>
       <button id="toggleRegister" type="button">Register</button>
@@ -232,11 +243,9 @@
         <label for="authPassword">Password</label>
         <input type="password" id="authPassword" required autocomplete="current-password" minlength="6">
       </div>
-      <button type="submit" id="authSubmit" class="btn-primary">Login</button>
+      <button type="submit" id="authSubmit" class="btn-secondary">Login</button>
       <p class="auth-error" id="authError"></p>
     </form>
-    <button type="button" id="demoLoginBtn" class="btn-secondary" style="width:100%;margin-top:1rem;">Login demo</button>
-    <p style="text-align:center;color:var(--text-dim);font-size:.7rem;margin-top:.7rem;">No account needed — loads the app with sample data. Nothing you do in demo mode is saved to a server.</p>
   </div>
 </div>
 
