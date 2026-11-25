@@ -41,6 +41,8 @@ create policy "companii_update_own" on public.companii
 create policy "companii_delete_own" on public.companii
   for delete using (auth.uid() = user_id);
 
+-- The insert and update policies below were tightened later, so an application can only
+-- point to one of your own companies: run aplicari_own_company.sql after this file.
 create policy "aplicari_select_own" on public.aplicari
   for select using (auth.uid() = user_id);
 create policy "aplicari_insert_own" on public.aplicari

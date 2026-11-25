@@ -22,9 +22,10 @@ A job tracker is a simple CRUD problem on the surface, but it's a good vehicle t
 ## Security
 
 - **Row Level Security on every table**, scoped to `auth.uid()` — a user can only select, insert, update, or delete their own rows. This isn't just an app-level filter; it's enforced by Postgres itself. The tables and all 12 policies are in [`supabase/schema.sql`](supabase/schema.sql).
+- **An application can only point to one of your own companies.** The insert and update policies on `aplicari` also check that its `companie_id` belongs to you ([`supabase/aplicari_own_company.sql`](supabase/aplicari_own_company.sql)), so a direct API call can't attach an application to someone else's company; the app's own form only ever offers yours anyway.
 - **Isolation was tested, not assumed.** A second test account was created specifically to confirm it saw zero companies and zero applications from the first account's data — not just that the queries "looked" scoped correctly. Re-checked on the live project in November 2026: the second account also couldn't rename or delete the first account's company (0 rows affected) or save a row in another user's name (HTTP 403).
 - **Users can delete their account and all their data** (header → *Delete account*, confirmed by typing DELETE). The browser can't delete an account with the public key, so this goes through a `security definer` database function, [`supabase/delete_my_account.sql`](supabase/delete_my_account.sql), that only ever acts on the user calling it (`auth.uid()`). The shared demo account is protected from deletion.
-- **Strict CSP**: no `'unsafe-inline'` for scripts or styles. All CSS is in `styles.css` and all JS in `app.js`, so the pages have no `<style>` blocks and no `style=""` or `onclick=""` attributes. Delivered as a real HTTP header via `_headers` on Netlify (not just a `<meta>` tag, which can't carry `frame-ancestors`), plus `X-Frame-Options`, `X-Content-Type-Options`, and a locked-down `Referrer-Policy`.
+- **Strict CSP**: no `'unsafe-inline'` for scripts or styles. All CSS is in `styles.css` and all JS in `logic.js` and `app.js`, so the pages have no `<style>` blocks and no `style=""` or `onclick=""` attributes. Delivered as a real HTTP header via `_headers` on Netlify (not just a `<meta>` tag, which can't carry `frame-ancestors`), plus `X-Frame-Options`, `X-Content-Type-Options`, and a locked-down `Referrer-Policy`.
 - **Supabase key in the client is the publishable key** (Supabase's current name for what used to be called the anon key) — it's designed to be public; the real access control is the RLS policies above, not key secrecy.
 - **Registration errors are deliberately ambiguous** about whether an email is already registered, to avoid account enumeration.
 
@@ -48,7 +49,7 @@ No build step and nothing to install. To try it without an account, open the liv
 To run it on your own database:
 
 1. Create a free project at [supabase.com](https://supabase.com).
-2. In **SQL Editor**, run [`supabase/schema.sql`](supabase/schema.sql) (the three tables and their RLS policies), then [`supabase/delete_my_account.sql`](supabase/delete_my_account.sql) (the "Delete account" function).
+2. In **SQL Editor**, run [`supabase/schema.sql`](supabase/schema.sql) (the three tables and their RLS policies), then [`supabase/aplicari_own_company.sql`](supabase/aplicari_own_company.sql) (an application can only point to your own company), then [`supabase/delete_my_account.sql`](supabase/delete_my_account.sql) (the "Delete account" function).
 3. In **Settings → API**, copy the project URL and the publishable (anon) key into the two constants at the top of [`app.js`](app.js). The publishable key is meant to be public; RLS is what protects the data.
 4. Put the same project URL in the `connect-src` part of the CSP, in [`_headers`](_headers) and in the `<meta>` CSP in `index.html`, or the browser will block the requests.
 5. Serve the folder over HTTP (for example `npx serve .`), or drag it into Netlify. Opening `index.html` straight from the disk won't register the service worker.
@@ -74,7 +75,7 @@ offline.html       — offline fallback page, with offline.css
 manifest.json      — PWA manifest
 _headers           — Netlify security headers (CSP, X-Frame-Options, ...)
 icons/             — PWA icons
-supabase/          — schema.sql (tables + RLS policies), delete_my_account.sql
+supabase/          — schema.sql (tables + RLS policies), aplicari_own_company.sql, delete_my_account.sql
 ```
 
 ## License
