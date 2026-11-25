@@ -273,14 +273,31 @@ async function loadAplicari(){
    Reason: otherwise, selecting text in an input/textarea (a click+drag that
    visually ends over the backdrop) would accidentally close the modal and you
    would lose what you were writing. */
+/* Keyboard and screen readers: the window is announced as a dialog, Escape works like
+   Cancel, Tab stays inside it, and focus goes back to the button that opened it. */
+let modalOpener = null;
+function onModalKeydown(e){
+  const modal = document.querySelector("#modalRoot .modal");
+  if(!modal) return;
+  if(e.key === "Escape"){ e.preventDefault(); closeModal(); return; }
+  if(e.key !== "Tab") return;
+  const items = [...modal.querySelectorAll("button, [href], input, select, textarea")]
+    .filter(el => !el.disabled && el.offsetParent !== null);
+  if(!items.length) return;
+  const first = items[0], last = items[items.length - 1];
+  if(e.shiftKey && (document.activeElement === first || !modal.contains(document.activeElement))){ e.preventDefault(); last.focus(); }
+  else if(!e.shiftKey && (document.activeElement === last || !modal.contains(document.activeElement))){ e.preventDefault(); first.focus(); }
+}
+
 function openModal(title, bodyHtml, onSubmit){
   const root = document.getElementById("modalRoot");
+  modalOpener = document.activeElement;
   root.innerHTML = `
     <div class="modal-backdrop" id="modalBackdrop">
-      <div class="modal">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
         <div class="modal-titlebar">
-          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-          <h3>${title}</h3>
+          <span class="dot" aria-hidden="true"></span><span class="dot" aria-hidden="true"></span><span class="dot" aria-hidden="true"></span>
+          <h3 id="modalTitle">${title}</h3>
         </div>
         <div class="modal-body">
           <form id="modalForm">${bodyHtml}
@@ -300,8 +317,16 @@ function openModal(title, bodyHtml, onSubmit){
     e.preventDefault();
     await onSubmit(new FormData(e.target));
   });
+  document.removeEventListener("keydown", onModalKeydown);
+  document.addEventListener("keydown", onModalKeydown);
+  (form.querySelector("input, select, textarea") || saveBtn).focus();
 }
-function closeModal(){ document.getElementById("modalRoot").innerHTML = ""; }
+function closeModal(){
+  document.getElementById("modalRoot").innerHTML = "";
+  document.removeEventListener("keydown", onModalKeydown);
+  if(modalOpener && document.contains(modalOpener)) modalOpener.focus();
+  modalOpener = null;
+}
 
 /* ---------------- Companii CRUD ---------------- */
 document.getElementById("addCompanyBtn").addEventListener("click", ()=>openCompanyModal());

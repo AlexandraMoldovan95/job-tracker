@@ -37,9 +37,21 @@ A job tracker is a simple CRUD problem on the surface, but it's a good vehicle t
 ## Design notes
 
 - **Visual direction:** a vaporwave/outrun theme (cyan/magenta on near-black, skewed buttons, CRT scanline overlay, Orbitron + Share Tech Mono) — a deliberate choice to make a CRUD app memorable rather than generic.
-- **Modal UX fix:** modals used to close on any click outside them, which meant selecting text inside a field (a click-and-drag that visually ends over the backdrop) could silently discard unsaved input. Fixed by removing backdrop-close entirely — only explicit Cancel or Save — plus a visual cue (the Save button highlights) when there are unsaved changes.
+- **Modal UX fix:** modals used to close on any click outside them, which meant selecting text inside a field (a click-and-drag that visually ends over the backdrop) could silently discard unsaved input. Fixed by removing backdrop-close entirely — only explicit Cancel or Save — plus a visual cue (the Save button highlights) when there are unsaved changes. From the keyboard, Escape works like Cancel, Tab stays inside the window, and focus returns to the button that opened it; screen readers announce it as a dialog.
 - **Service worker scope, deliberately narrow:** it exists only to make the app installable and to show a proper offline fallback page — it does **not** cache `index.html`/CSS/JS, because the app is live-data-dependent anyway, and caching the app shell would just produce the classic PWA bug of users stuck on a stale version after a deploy.
 - **Stripe integration is demonstration-only**, explicitly in test mode (`buy.stripe.com/test_...`) — it opens a Stripe-hosted Payment Link with no backend or webhook behind it; no real payment is possible, and the app never grants access based on payment.
+
+## Run it yourself
+
+No build step and nothing to install. To try it without an account, open the live demo and press **Login demo**: sample data, stored only in your browser.
+
+To run it on your own database:
+
+1. Create a free project at [supabase.com](https://supabase.com).
+2. In **SQL Editor**, run [`supabase/schema.sql`](supabase/schema.sql) (the three tables and their RLS policies), then [`supabase/delete_my_account.sql`](supabase/delete_my_account.sql) (the "Delete account" function).
+3. In **Settings → API**, copy the project URL and the publishable (anon) key into the two constants at the top of [`app.js`](app.js). The publishable key is meant to be public; RLS is what protects the data.
+4. Put the same project URL in the `connect-src` part of the CSP, in [`_headers`](_headers) and in the `<meta>` CSP in `index.html`, or the browser will block the requests.
+5. Serve the folder over HTTP (for example `npx serve .`), or drag it into Netlify. Opening `index.html` straight from the disk won't register the service worker.
 
 ## Project structure
 
@@ -51,6 +63,7 @@ offline.html       — offline fallback page
 manifest.json      — PWA manifest
 _headers           — Netlify security headers (CSP, X-Frame-Options, ...)
 icons/             — PWA icons
+supabase/          — schema.sql (tables + RLS policies), delete_my_account.sql
 ```
 
 ## License
