@@ -105,10 +105,13 @@
   .row-actions button{transform:skewX(-3deg);padding:.4em .8em;font-size:.72rem;}
   .row-actions button:hover{transform:skewX(0deg);}
 
-  input,select,textarea{font-family:var(--font-body);font-size:.9rem;padding:.6em .3em;
-    border:none;border-bottom:2px solid var(--magenta);border-radius:0;
-    background:#000;color:var(--accent);width:100%;}
-  input::placeholder,textarea::placeholder{color:rgba(255,0,255,.45);}
+  /* Fields sit on the deep purple surface with a thin outline (they were pure black "holes"
+     on the card); the magenta underline stays as the neon accent. Placeholder at full-ish
+     strength: at 45% opacity it measured about 2:1. */
+  input,select,textarea{font-family:var(--font-body);font-size:.9rem;padding:.6em .55em;
+    border:1px solid var(--border);border-bottom:2px solid var(--magenta);border-radius:0;
+    background:var(--surface-2);color:var(--accent);width:100%;}
+  input::placeholder,textarea::placeholder{color:rgba(255,140,255,.85);}
   input:focus-visible,select:focus-visible,textarea:focus-visible{
     border-bottom-color:var(--accent);box-shadow:0 4px 12px -4px var(--accent);}
   label{display:block;font-size:.72rem;color:var(--text-dim);margin-bottom:.4em;
