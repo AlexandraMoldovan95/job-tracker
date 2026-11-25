@@ -32,8 +32,8 @@ if("serviceWorker" in navigator){
   });
 }
 
-const STATUS_LABELS = { aplicat:"Applied", interviu:"Interview", oferta:"Offer", respins:"Rejected", retras:"Withdrawn" };
-const STATUS_ORDER = ["aplicat","interviu","oferta","respins","retras"];
+// STATUS_LABELS, STATUS_ORDER, CV_FIELDS, escapeHtml, friendlyAuthError and the Dashboard /
+// resume-export logic are in logic.js (loaded first), with tests in tests/logic.test.js.
 
 let currentUser = null;
 let companii = [];
@@ -148,15 +148,6 @@ document.getElementById("authForm").addEventListener("submit", async (e)=>{
    — that would allow account enumeration (someone could check, email by
    email, who uses the app). The message below is intentionally ambiguous
    on registration. */
-function friendlyAuthError(msg, mode){
-  if(mode === "register" && /already registered/i.test(msg)){
-    return "Registration failed. Check the email you entered, or try logging in instead.";
-  }
-  if(/invalid login credentials/i.test(msg)) return "Incorrect email or password.";
-  if(/password/i.test(msg) && /6/i.test(msg)) return "Password must be at least 6 characters.";
-  return msg || "Something went wrong.";
-}
-
 document.getElementById("logoutBtn").addEventListener("click", async ()=>{
   if(DEMO_MODE){
     DEMO_MODE = false;
@@ -524,14 +515,6 @@ document.getElementById("cvList").addEventListener("click", (e)=>{
   else if(btn.dataset.action === "delete") deleteCv(id);
 });
 
-const CV_FIELDS = [
-  { key:"descriere",   label:"Description / About me",   rows:3,  placeholder:"A short summary about you (optional)." },
-  { key:"experienta",  label:"Experience",                rows:6,  placeholder:"Jobs, role, period, achievements..." },
-  { key:"educatie",    label:"Education",                 rows:4,  placeholder:"School/university, major, period..." },
-  { key:"competente",  label:"Skills",                    rows:3,  placeholder:"Technical skills, tools, languages..." },
-  { key:"proiecte",    label:"Projects",                  rows:4,  placeholder:"Relevant personal/course projects..." },
-  { key:"voluntariat", label:"Volunteering",              rows:3,  placeholder:"Volunteer activities (optional)." },
-];
 
 function openCvModal(cv){
   const isEdit = !!cv;
@@ -615,37 +598,12 @@ function editCvById(id){ openCvModal(cvVersiuni.find(cv=>cv.id===id)); }
 function exportCv(id){
   const cv = cvVersiuni.find(c=>c.id===id);
   if(!cv) return;
-  const sections = CV_FIELDS
-    .filter(f=>cv[f.key] && cv[f.key].trim())
-    .map(f=>`<section><h2>${escapeHtml(f.label)}</h2><pre>${escapeHtml(cv[f.key])}</pre></section>`)
-    .join("\n");
-  const html = `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtml(cv.nume_versiune)} — CV</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:wght@600&family=Source+Sans+3:wght@400;600&display=swap">
-<style>
-  body{font-family:"Source Sans 3",Georgia,serif;max-width:720px;margin:40px auto;padding:0 24px 60px;color:#2c2620;line-height:1.65;}
-  h1{font-family:"Newsreader",Georgia,serif;font-size:1.7rem;font-weight:600;border-bottom:2px solid #2b6777;padding-bottom:.35em;margin-bottom:.2em;}
-  h2{font-family:"Newsreader",Georgia,serif;font-size:1.1rem;font-weight:600;color:#2b6777;margin:1.6em 0 .3em;}
-  .meta{color:#6f6656;font-size:.82rem;margin-bottom:1.8rem;}
-  pre{white-space:pre-wrap;word-wrap:break-word;font-family:inherit;font-size:1rem;margin:0;}
-  @media print{ body{margin:0;padding:20px;} }
-</style>
-</head>
-<body>
-<h1>${escapeHtml(cv.nume_versiune)}</h1>
-<div class="meta">Exported from Job Tracker — ${new Date().toLocaleDateString("en-US")}</div>
-${sections || '<p style="color:#6f6656;">No content added yet.</p>'}
-</body>
-</html>`;
+  const html = buildCvExportHtml(cv, new Date().toLocaleDateString("en-US"));   // logic.js
   const blob = new Blob([html], { type:"text/html" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = (cv.nume_versiune || "cv").replace(/[^a-z0-9-_ ]/gi, "_").trim() + ".html";
+  a.download = cvExportFileName(cv.nume_versiune);
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -655,20 +613,18 @@ ${sections || '<p style="color:#6f6656;">No content added yet.</p>'}
 
 /* ---------------- Dashboard ---------------- */
 function renderDashboard(){
-  document.getElementById("statTotal").textContent = aplicari.length;
-  document.getElementById("statCompanii").textContent = companii.length;
-  const finalizate = aplicari.filter(a=>["interviu","oferta","respins"].includes(a.status)).length;
-  const rate = aplicari.length ? Math.round((finalizate/aplicari.length)*100) : 0;
-  document.getElementById("statRate").textContent = rate + "%";
-  document.getElementById("statOferte").textContent = aplicari.filter(a=>a.status==="oferta").length;
+  const stats = dashboardStats(aplicari, companii);   // the numbers: logic.js
+  document.getElementById("statTotal").textContent = stats.total;
+  document.getElementById("statCompanii").textContent = stats.companies;
+  document.getElementById("statRate").textContent = stats.responseRate + "%";
+  document.getElementById("statOferte").textContent = stats.offers;
 
-  const max = Math.max(1, ...STATUS_ORDER.map(s=>aplicari.filter(a=>a.status===s).length));
   const barsEl = document.getElementById("statusBars");
   // The colour comes from a class in styles.css (bar-fill-<status>). The width is set below,
   // through the DOM: the CSP blocks style="" attributes inside HTML, not el.style.
   barsEl.innerHTML = STATUS_ORDER.map(s=>{
-    const count = aplicari.filter(a=>a.status===s).length;
-    const pct = (count/max)*100;
+    const count = stats.statusCounts[s];
+    const pct = (count/stats.maxStatusCount)*100;
     return `<div class="bar-row">
       <div class="bar-label">${STATUS_LABELS[s]}</div>
       <div class="bar-track"><div class="bar-fill bar-fill-${s}" data-pct="${pct}"></div></div>
@@ -677,16 +633,9 @@ function renderDashboard(){
   }).join("");
   barsEl.querySelectorAll(".bar-fill").forEach(el=>{ el.style.width = el.dataset.pct + "%"; });
 
-  const counts = {};
-  aplicari.forEach(a=>{ const n = a.companii?.nume || "—"; counts[n] = (counts[n]||0)+1; });
-  const top = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const top = stats.topCompanies;
   const topEl = document.getElementById("topCompanies");
   topEl.innerHTML = top.length
     ? top.map(([nume,count])=>`<div class="top-company"><span>${escapeHtml(nume)}</span><strong>${count}</strong></div>`).join("")
     : `<div class="empty-state">No data yet.</div>`;
-}
-
-/* ---------------- Utils ---------------- */
-function escapeHtml(s){
-  return String(s ?? "").replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m]));
 }

@@ -53,12 +53,22 @@ To run it on your own database:
 4. Put the same project URL in the `connect-src` part of the CSP, in [`_headers`](_headers) and in the `<meta>` CSP in `index.html`, or the browser will block the requests.
 5. Serve the folder over HTTP (for example `npx serve .`), or drag it into Netlify. Opening `index.html` straight from the disk won't register the service worker.
 
+## Tests
+
+```bash
+node --test "tests/*.test.js"
+```
+
+15 unit tests for `logic.js`, the part with no DOM and no Supabase: escaping user text (markup typed into a company name or a resume stays text, in the app and in the exported file), the auth messages (registering with an email that already has an account doesn't confirm it), the Dashboard numbers (response rate with no applications, rounding, top 5 companies) and the exported resume (empty sections left out, a safe file name). Plain Node, nothing to install; they run in CI on every push. Writing them found one small bug, fixed: a resume named with spaces only was exported as `.html`, with no name. The parts that need a browser or the database (login, CRUD, RLS, the modals) were tested by hand and with scripted browser runs, see [Security](#security).
+
 ## Project structure
 
 ```
 index.html         — the application shell and markup
 styles.css         — all the app's styles
-app.js             — auth, CRUD, dashboard, resume export, all client-side logic
+logic.js           — the pure logic, no DOM: escaping, auth messages, Dashboard numbers, resume export
+app.js             — auth, CRUD, rendering and events (the page side), demo mode
+tests/             — unit tests for logic.js (node --test)
 sw.js              — service worker (install + offline fallback only)
 offline.html       — offline fallback page, with offline.css
 manifest.json      — PWA manifest
