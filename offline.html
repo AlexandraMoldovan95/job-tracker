@@ -6,36 +6,15 @@
 <title>No connection — Job Tracker</title>
 <meta name="theme-color" content="#00FFFF">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Share+Tech+Mono&display=swap">
-<style>
-  :root{
-    --bg:#090014; --card-bg:rgba(26,16,60,.82); --accent:#00FFFF; --magenta:#FF00FF;
-    --orange:#FF9900; --text:#E0E0E0; --text-dim:rgba(224,224,224,.62);
-  }
-  *{box-sizing:border-box;}
-  body{
-    margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;
-    background:
-      radial-gradient(720px 460px at 50% -8%, rgba(255,153,0,.16), rgba(255,0,255,.10) 42%, transparent 72%),
-      var(--bg);
-    color:var(--text);font-family:"Share Tech Mono",monospace;text-align:center;
-  }
-  .card{background:var(--card-bg);backdrop-filter:blur(8px);border:2px solid var(--accent);
-    box-shadow:0 0 40px rgba(0,255,255,.18);padding:2.4rem;max-width:420px;}
-  h1{font-family:"Orbitron",sans-serif;font-size:1.4rem;text-transform:uppercase;margin:0 0 .6em;
-    background:linear-gradient(to right,var(--orange),var(--magenta),var(--accent));
-    -webkit-background-clip:text;background-clip:text;color:transparent;}
-  p{color:var(--text-dim);font-size:.9rem;line-height:1.6;margin:0 0 1.4em;}
-  button{font-family:inherit;cursor:pointer;border:2px solid var(--accent);color:var(--accent);
-    background:transparent;padding:.7em 1.4em;font-size:.85rem;font-weight:700;text-transform:uppercase;
-    letter-spacing:.08em;transform:skewX(-6deg);transition:all .18s linear;}
-  button:hover{background:var(--accent);color:#000;box-shadow:0 0 20px var(--accent);transform:skewX(0deg);}
-</style>
+<link rel="stylesheet" href="offline.css">
 </head>
 <body>
   <div class="card">
     <h1>No connection</h1>
     <p>Job Tracker needs internet to work — your data lives live in Supabase, not locally on your phone/computer. Reconnect and try again.</p>
-    <button onclick="location.reload()">Retry</button>
+    <!-- A link back to this same address, not a button with onclick="": the CSP blocks inline
+         scripts, so the old button did nothing on the live site. -->
+    <a class="retry" href="">Retry</a>
   </div>
 </body>
 </html>

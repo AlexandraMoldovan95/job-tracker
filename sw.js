@@ -12,16 +12,18 @@
   you ship an update, until they manually clear the cache. Better no cache on
   the code than a wrong cache.
 
-  The only thing cached is the static fallback page (offline.html), which
-  doesn't change often and holds no data.
+  The only things cached are the static fallback page (offline.html) and its
+  stylesheet (offline.css), which don't change often and hold no data. The
+  stylesheet is a separate file because the CSP blocks inline <style> blocks.
 */
 
-const CACHE_NAME = "job-tracker-shell-v1";
+const CACHE_NAME = "job-tracker-shell-v2";   // v2: offline.css added
 const OFFLINE_URL = "offline.html";
+const OFFLINE_CSS = "offline.css";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.add(OFFLINE_URL))
+    caches.open(CACHE_NAME).then((cache) => cache.addAll([OFFLINE_URL, OFFLINE_CSS]))
   );
   self.skipWaiting();
 });
@@ -36,7 +38,12 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  // We only touch page navigations (i.e. the actual loading of the app).
+  // The offline page's stylesheet: network first, the cached copy when offline.
+  if (new URL(event.request.url).pathname.endsWith("/" + OFFLINE_CSS)) {
+    event.respondWith(fetch(event.request).catch(() => caches.match(OFFLINE_CSS)));
+    return;
+  }
+  // Otherwise we only touch page navigations (i.e. the actual loading of the app).
   // We don't intercept requests to Supabase, fonts, or other resources —
   // those go straight to the network, as if this file didn't exist.
   if (event.request.mode !== "navigate") return;

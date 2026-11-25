@@ -662,17 +662,20 @@ function renderDashboard(){
   document.getElementById("statRate").textContent = rate + "%";
   document.getElementById("statOferte").textContent = aplicari.filter(a=>a.status==="oferta").length;
 
-  const barColors = { aplicat:"var(--neutral)", interviu:"var(--warn)", oferta:"var(--good)", respins:"var(--bad)", retras:"#4a3d73" };
   const max = Math.max(1, ...STATUS_ORDER.map(s=>aplicari.filter(a=>a.status===s).length));
-  document.getElementById("statusBars").innerHTML = STATUS_ORDER.map(s=>{
+  const barsEl = document.getElementById("statusBars");
+  // The colour comes from a class in styles.css (bar-fill-<status>). The width is set below,
+  // through the DOM: the CSP blocks style="" attributes inside HTML, not el.style.
+  barsEl.innerHTML = STATUS_ORDER.map(s=>{
     const count = aplicari.filter(a=>a.status===s).length;
     const pct = (count/max)*100;
     return `<div class="bar-row">
       <div class="bar-label">${STATUS_LABELS[s]}</div>
-      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${barColors[s]}"></div></div>
+      <div class="bar-track"><div class="bar-fill bar-fill-${s}" data-pct="${pct}"></div></div>
       <div class="bar-count">${count}</div>
     </div>`;
   }).join("");
+  barsEl.querySelectorAll(".bar-fill").forEach(el=>{ el.style.width = el.dataset.pct + "%"; });
 
   const counts = {};
   aplicari.forEach(a=>{ const n = a.companii?.nume || "—"; counts[n] = (counts[n]||0)+1; });
