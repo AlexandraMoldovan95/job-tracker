@@ -60,7 +60,7 @@ To run it on your own database:
 node --test "tests/*.test.js"
 ```
 
-15 unit tests for `logic.js`, the part with no DOM and no Supabase: escaping user text (markup typed into a company name or a resume stays text, in the app and in the exported file), the auth messages (registering with an email that already has an account doesn't confirm it), the Dashboard numbers (response rate with no applications, rounding, top 5 companies) and the exported resume (empty sections left out, a safe file name). Plain Node, nothing to install; they run in CI on every push. Writing them found one small bug, fixed: a resume named with spaces only was exported as `.html`, with no name. The parts that need a browser or the database (login, CRUD, RLS, the modals) were tested by hand and with scripted browser runs, see [Security](#security).
+17 unit tests for `logic.js`, the part with no DOM and no Supabase: escaping user text (markup typed into a company name or a resume stays text, in the app and in the exported file), the auth messages (registering with an email that already has an account doesn't confirm it), the Dashboard numbers (response rate with no applications, rounding, top 5 companies), the exported resume (empty sections left out, a safe file name) and when "Back to top" shows (only on a page at least two screens tall, after half a screen of scrolling). Plain Node, nothing to install; they run in CI on every push. Writing them found one small bug, fixed: a resume named with spaces only was exported as `.html`, with no name. The parts that need a browser or the database (login, CRUD, RLS, the modals) were tested by hand and with scripted browser runs, see [Security](#security).
 
 ## Project structure
 

@@ -88,9 +88,16 @@ function cvExportFileName(name){
   return ((name || "").replace(/[^a-z0-9-_ ]/gi, "_").trim() || "cv") + ".html";
 }
 
+/* "Back to top" (the button in the bottom-right corner): shown only when the page is at least two
+   screens tall (many companies or applications) and the user has scrolled down at least half a
+   screen. With a short list, or at the top, it would only be in the way. */
+function shouldShowToTop(scrollY, viewportHeight, pageHeight){
+  return pageHeight >= viewportHeight * 2 && scrollY >= viewportHeight / 2;
+}
+
 // In Node (the tests) `module` exists and the functions are exported; in the browser it doesn't,
 // so this is skipped and everything above stays a plain global for app.js.
 if (typeof module !== "undefined" && module.exports) {
   module.exports = { STATUS_LABELS, STATUS_ORDER, CV_FIELDS, escapeHtml, friendlyAuthError,
-                     dashboardStats, buildCvExportHtml, cvExportFileName };
+                     dashboardStats, buildCvExportHtml, cvExportFileName, shouldShowToTop };
 }

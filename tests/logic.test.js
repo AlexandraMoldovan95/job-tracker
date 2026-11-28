@@ -119,3 +119,16 @@ test("a name that is empty or only spaces becomes cv.html", () => {
   assert.equal(L.cvExportFileName(undefined), "cv.html");
   assert.equal(L.cvExportFileName("   "), "cv.html");   // used to give ".html"
 });
+
+test("back to top: hidden on a page shorter than two screens (a short list), however far it's scrolled", () => {
+  assert.equal(L.shouldShowToTop(0, 900, 900), false);
+  assert.equal(L.shouldShowToTop(700, 900, 1600), false);
+  assert.equal(L.shouldShowToTop(899, 900, 1799), false);
+});
+
+test("back to top: on a long page (many companies or applications), only after half a screen of scrolling", () => {
+  assert.equal(L.shouldShowToTop(0, 900, 5000), false);
+  assert.equal(L.shouldShowToTop(449, 900, 5000), false);
+  assert.equal(L.shouldShowToTop(450, 900, 5000), true);
+  assert.equal(L.shouldShowToTop(422, 844, 1688), true);   // exactly two phone screens
+});

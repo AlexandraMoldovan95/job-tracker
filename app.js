@@ -639,3 +639,31 @@ function renderDashboard(){
     ? top.map(([nume,count])=>`<div class="top-company"><span>${escapeHtml(nume)}</span><strong>${count}</strong></div>`).join("")
     : `<div class="empty-state">No data yet.</div>`;
 }
+
+// ===================== BACK TO TOP =====================
+// Shown only when the page is long enough to need it (shouldShowToTop in logic.js): checked on
+// scroll, on resize and whenever the page's height changes (companies or applications added,
+// another tab, login). A click scrolls up (instantly with reduced motion) and puts keyboard focus
+// on the first visible link or button, at the top.
+(function setUpBackToTop(){
+  const btn = document.getElementById("toTopBtn");
+  if(!btn) return;
+  let queued = false;
+  const update = ()=>{
+    queued = false;
+    btn.classList.toggle("is-shown",
+      shouldShowToTop(window.scrollY, window.innerHeight, document.documentElement.scrollHeight));
+  };
+  const queue = ()=>{ if(!queued){ queued = true; requestAnimationFrame(update); } };
+  window.addEventListener("scroll", queue, { passive:true });
+  window.addEventListener("resize", queue);
+  if("ResizeObserver" in window) new ResizeObserver(queue).observe(document.body);
+  btn.addEventListener("click", ()=>{
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top:0, behavior: reduce ? "auto" : "smooth" });
+    const first = [...document.querySelectorAll("a[href], button:not([disabled])")]
+      .find(el => el !== btn && el.offsetParent !== null);
+    if(first) first.focus({ preventScroll:true });
+  });
+  update();
+})();
