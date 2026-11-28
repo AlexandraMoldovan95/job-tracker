@@ -132,3 +132,14 @@ test("back to top: on a long page (many companies or applications), only after h
   assert.equal(L.shouldShowToTop(450, 900, 5000), true);
   assert.equal(L.shouldShowToTop(422, 844, 1688), true);   // exactly two phone screens
 });
+
+test("theme: a saved choice wins over the system setting", () => {
+  assert.equal(L.pickTheme("light", true), "light");
+  assert.equal(L.pickTheme("dark", false), "dark");
+});
+
+test("theme: with nothing saved (or something else), the system setting decides", () => {
+  assert.equal(L.pickTheme(null, true), "dark");
+  assert.equal(L.pickTheme(null, false), "light");
+  assert.equal(L.pickTheme("purple", false), "light");
+});

@@ -98,8 +98,7 @@ document.getElementById("demoLoginBtn").addEventListener("click", ()=>{
 /* ---------------- Toast ---------------- */
 function toast(msg, isError){
   const el = document.createElement("div");
-  el.className = "toast";
-  if(isError){ el.style.background = "var(--bad)"; el.style.borderColor = "var(--bad)"; el.style.color = "#050010"; }
+  el.className = isError ? "toast toast-error" : "toast";   // colours in styles.css, per theme
   el.textContent = msg;
   document.getElementById("toastRoot").appendChild(el);
   setTimeout(()=>el.remove(), 3200);
@@ -639,6 +638,24 @@ function renderDashboard(){
     ? top.map(([nume,count])=>`<div class="top-company"><span>${escapeHtml(nume)}</span><strong>${count}</strong></div>`).join("")
     : `<div class="empty-state">No data yet.</div>`;
 }
+
+// ===================== THEME =====================
+// The light/dark buttons (login card and app header) switch the theme and save the choice in this
+// browser; theme-init.js applies it before the page is drawn on the next visit. With nothing saved,
+// the system setting decides (pickTheme in logic.js). aria-pressed says whether dark is on.
+(function setUpThemeToggle(){
+  const root = document.documentElement;
+  const buttons = document.querySelectorAll(".theme-toggle");
+  const isDark = ()=> root.getAttribute("data-theme") !== "light";
+  const sync = ()=> buttons.forEach(b=> b.setAttribute("aria-pressed", String(isDark())));
+  buttons.forEach(b=> b.addEventListener("click", ()=>{
+    const next = isDark() ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    try{ localStorage.setItem("jt-theme", next); }catch(e){ /* not saved (storage blocked): lasts this visit */ }
+    sync();
+  }));
+  sync();
+})();
 
 // ===================== BACK TO TOP =====================
 // Shown only when the page is long enough to need it (shouldShowToTop in logic.js): checked on

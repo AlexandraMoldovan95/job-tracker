@@ -95,9 +95,17 @@ function shouldShowToTop(scrollY, viewportHeight, pageHeight){
   return pageHeight >= viewportHeight * 2 && scrollY >= viewportHeight / 2;
 }
 
+/* The theme to show: the user's saved choice ("dark" or "light", from the header button) wins;
+   anything else, including nothing saved yet, follows the system setting. theme-init.js calls it
+   in <head>, before the page is drawn. */
+function pickTheme(saved, systemPrefersDark){
+  if (saved === "dark" || saved === "light") return saved;
+  return systemPrefersDark ? "dark" : "light";
+}
+
 // In Node (the tests) `module` exists and the functions are exported; in the browser it doesn't,
 // so this is skipped and everything above stays a plain global for app.js.
 if (typeof module !== "undefined" && module.exports) {
   module.exports = { STATUS_LABELS, STATUS_ORDER, CV_FIELDS, escapeHtml, friendlyAuthError,
-                     dashboardStats, buildCvExportHtml, cvExportFileName, shouldShowToTop };
+                     dashboardStats, buildCvExportHtml, cvExportFileName, shouldShowToTop, pickTheme };
 }

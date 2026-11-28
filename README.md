@@ -38,6 +38,7 @@ A job tracker is a simple CRUD problem on the surface, but it's a good vehicle t
 ## Design notes
 
 - **Visual direction:** a vaporwave/outrun theme (cyan/magenta on near-black, skewed buttons, CRT scanline overlay, Orbitron + Share Tech Mono) — a deliberate choice to make a CRUD app memorable rather than generic.
+- **Light and dark.** The same look in daylight: a pale lavender sky, deep ink, and the same neons darkened until they pass WCAG AA as text (every text measured, in both themes, on every screen). A button on the login card and in the header switches it and remembers the choice; a first visit follows the system setting. `theme-init.js` sets it before the page is drawn, so there's no flash of the other theme. Measuring the dark theme found two status badges under AA (Applied 3.2:1, Withdrawn about 2:1); both were lightened.
 - **Modal UX fix:** modals used to close on any click outside them, which meant selecting text inside a field (a click-and-drag that visually ends over the backdrop) could silently discard unsaved input. Fixed by removing backdrop-close entirely — only explicit Cancel or Save — plus a visual cue (the Save button highlights) when there are unsaved changes. From the keyboard, Escape works like Cancel, Tab stays inside the window, and focus returns to the button that opened it; screen readers announce it as a dialog.
 - **Service worker scope, deliberately narrow:** it exists only to make the app installable and to show a proper offline fallback page — it does **not** cache `index.html`/CSS/JS, because the app is live-data-dependent anyway, and caching the app shell would just produce the classic PWA bug of users stuck on a stale version after a deploy.
 - **Stripe integration is demonstration-only**, explicitly in test mode (`buy.stripe.com/test_...`) — it opens a Stripe-hosted Payment Link with no backend or webhook behind it; no real payment is possible, and the app never grants access based on payment.
@@ -60,14 +61,15 @@ To run it on your own database:
 node --test "tests/*.test.js"
 ```
 
-17 unit tests for `logic.js`, the part with no DOM and no Supabase: escaping user text (markup typed into a company name or a resume stays text, in the app and in the exported file), the auth messages (registering with an email that already has an account doesn't confirm it), the Dashboard numbers (response rate with no applications, rounding, top 5 companies), the exported resume (empty sections left out, a safe file name) and when "Back to top" shows (only on a page at least two screens tall, after half a screen of scrolling). Plain Node, nothing to install; they run in CI on every push. Writing them found one small bug, fixed: a resume named with spaces only was exported as `.html`, with no name. The parts that need a browser or the database (login, CRUD, RLS, the modals) were tested by hand and with scripted browser runs, see [Security](#security).
+19 unit tests for `logic.js`, the part with no DOM and no Supabase: escaping user text (markup typed into a company name or a resume stays text, in the app and in the exported file), the auth messages (registering with an email that already has an account doesn't confirm it), the Dashboard numbers (response rate with no applications, rounding, top 5 companies), the exported resume (empty sections left out, a safe file name), when "Back to top" shows (only on a page at least two screens tall, after half a screen of scrolling) and the theme choice (a saved choice wins over the system setting). Plain Node, nothing to install; they run in CI on every push. Writing them found one small bug, fixed: a resume named with spaces only was exported as `.html`, with no name. The parts that need a browser or the database (login, CRUD, RLS, the modals) were tested by hand and with scripted browser runs, see [Security](#security).
 
 ## Project structure
 
 ```
 index.html         — the application shell and markup
-styles.css         — all the app's styles
-logic.js           — the pure logic, no DOM: escaping, auth messages, Dashboard numbers, resume export
+styles.css         — all the app's styles, both themes
+logic.js           — the pure logic, no DOM: escaping, auth messages, Dashboard numbers, resume export, theme choice
+theme-init.js      — puts the light or dark theme on the page before it's drawn
 app.js             — auth, CRUD, rendering and events (the page side), demo mode
 tests/             — unit tests for logic.js (node --test)
 sw.js              — service worker (install + offline fallback only)
